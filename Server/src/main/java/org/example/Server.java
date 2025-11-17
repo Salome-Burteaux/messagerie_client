@@ -6,29 +6,29 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.io.IOUtils;
-import com.google.common.collect.Lists;
 
 public class Server {
-    private int p;
+    private int port;
     private List<ClientHandler> _clientsList = new ArrayList<>();
-    private ServerSocket ss;
+    private ServerSocket serverSocket;
     private boolean isRunning = false;
     private List<String> hist = new ArrayList<>();
     private int count = 0;
 
     public Server(int port) {
-        this.p = port;
+
+        this.port = port;
     }
 
+    // crée un serverSocket
     public void start() throws IOException {
-        ss = new ServerSocket();
-        ss.bind(new InetSocketAddress("0.0.0.0", p));
+        serverSocket = new ServerSocket();
+        serverSocket.bind(new InetSocketAddress("0.0.0.0", port));
         isRunning = true;
-        System.out.println("Chat server started on port " + p);
+        System.out.println("Chat server started on port " + port);
 
         while (isRunning) {
-            Socket cs = ss.accept();
+            Socket cs = serverSocket.accept();
             ClientHandler ch = new ClientHandler(cs, this);
             _clientsList.add(ch);
             Thread t = new Thread(ch);
@@ -38,13 +38,13 @@ public class Server {
 
     public void stop() throws IOException {
         isRunning = false;
-        if (ss != null && !ss.isClosed()) {
-            ss.close();
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            serverSocket.close();
         }
     }
 
     // méthode pour envoyer message à tout le monde
-    public void broadcastMessage(ClientHandler expediteur, String msg) {
+    public void broadcastMessage(ClientHandler sender, String msg) {
         hist.add(msg);
         if (hist.size() > 100) {
             hist.remove(0);
@@ -52,7 +52,7 @@ public class Server {
 
         for (int i = 0; i < _clientsList.size(); i++) {
             ClientHandler c = _clientsList.get(i);
-            if (c != expediteur && c.nomUtilisateur != null) {
+            if (c != sender && c.userName != null) {
                 try {
                     c.out.println(msg);
                 } catch (Exception e) {
@@ -71,45 +71,77 @@ public class Server {
 
     // Classe interne pour gérer chaque client
     class ClientHandler implements Runnable {
-        Socket s;
-        PrintWriter out;
-        String nomUtilisateur;
+        private Socket socket;
+        private PrintWriter out;
+        private BufferedReader in;
+        private String userName;
         private int clientId;
 
-        public ClientHandler(Socket socket, Server srv) {
-            this.s = socket;
-            this.clientId = count++;
+        public ClientHandler(Socket socket, int clientId) {
+            this.socket = socket;
+            this.clientId = clientId;
         }
-
+        @Override
         public void run() {
             try {
-                InputStream in = s.getInputStream();
-                BufferedReader r = new BufferedReader(new InputStreamReader(in));
-                OutputStream outStream = s.getOutputStream();
-                out = new PrintWriter(new OutputStreamWriter(outStream), true);
+                setupStreams();
+                requestUserName();
+                sendHistoryToClient();
+                broadcastJoinMessage();
+                listenForMessages();
 
-                out.println("Enter your name: ");
-                nomUtilisateur = r.readLine();
-                String m = nomUtilisateur + " has joined the chat.";
-                System.out.println(m);
+            } catch (IOException e){
+                System.out.println("Client error: " + e.getMessage());
+            } finally {
+                disconnect();
+            }
+
+                InputStream in = socket.getInputStream();
+                BufferedReader r = new BufferedReader(new InputStreamReader(in));
+                OutputStream outStream = socket.getOutputStream();
+
 
                 sendHistoryToClient(this);
                 broadcastMessage(this, m);
 
-                String messageRecu;
-                while ((messageRecu = r.readLine()) != null) {
-                    m = nomUtilisateur + ": " + messageRecu;
+                String receivedMessage;
+                while ((receivedMessage = r.readLine()) != null) {
+                    m = userName + ": " + receivedMessage;
                     System.out.println(m);
                     broadcastMessage(this, m);
                 }
 
-                String msgLeave = nomUtilisateur + " has left the chat.";
+                String msgLeave = userName + " has left the chat.";
                 System.out.println(msgLeave);
                 broadcastMessage(this, msgLeave);
 
             } catch (IOException e) {
                 System.out.println("Client error");
             }
+
+
+
+        private void setupStreams() throws IOException {
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
+        }
+
+        private void requestUserName() {
+
+            out.println("Enter your name: ");
+            userName = in.readLine();
+            String m = userName + " has joined the chat.";
+            System.out.println(m);
+        };
+
+        private void broadcastJoinMessage() {
+
+        };
+
+        private void sendHistoryToClient() {};
+
+        private void listenForMessages() {};
+
         }
     }
 }

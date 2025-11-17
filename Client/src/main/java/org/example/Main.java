@@ -11,7 +11,7 @@ public class Main {
         int _Port = 12345;
         Client c = new Client(addr, _Port);
         try {
-            c.Connect();
+            c.connect();
         } catch (IOException | InterruptedException | ExecutionException e) {
             System.out.println("Failed");
         }

@@ -6,84 +6,87 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.apache.commons.io.IOUtils;
-import com.google.gson.Gson;
 
 public class Client {
-    private String adr;
-    private int p;
-    private Socket s;
-    private ExecutorService exec;
-    private BufferedReader lecteurConsole;
+    private String serverAddress;
+    private int serverPort;
+    private Socket socket;
+    private ExecutorService executor;
+    private BufferedReader consoleReader;
     private int messageCount = 0;
 
     public Client(String serverAddress, int serverPort) {
-        this.adr = serverAddress;
-        this.p = serverPort;
+        this.serverAddress = serverAddress;
+        this.serverPort = serverPort;
     }
 
-    // méthode pour se connecter
-    public void Connect() throws IOException, InterruptedException, ExecutionException {
-        s = new Socket(adr, p);
-        exec = Executors.newFixedThreadPool(2);
+    // Connects to the server and starts sending/receiving messages
+    public void connect() throws IOException, InterruptedException, ExecutionException {
+        openSocketConnection();
+        initializeExecutor();
 
-        Future<?> t1 = exec.submit(this::receiveMessages);
-        Thread.sleep(100);
-        Future<?> t2 = exec.submit(this::sendMessages);
+        // Submit the send/receive tasks
+        Future<?> receiveFuture = executor.submit(this::receiveMessages);
+        Future<?> sendFuture = executor.submit(this::sendMessages);
 
-        t1.get();
-        t2.get();
+        // Wait for both threads to finish
+        receiveFuture.get();
+        sendFuture.get();
 
         shutdown();
     }
 
-    // reception des messages
+    // Opens a socket connection to the server
+    private void openSocketConnection() throws IOException {
+        socket = new Socket(serverAddress, serverPort);
+    }
+
+    // Initializes a thread pool with 2 threads
+    private void initializeExecutor() {
+        executor = Executors.newFixedThreadPool(2);
+    }
+
+    // Receives messages from the server
     private void receiveMessages() {
-        try {
-            InputStream inputStream = s.getInputStream();
-            InputStreamReader isr = new InputStreamReader(inputStream);
-            BufferedReader r = new BufferedReader(isr);
-            String msg;
-            while ((msg = r.readLine()) != null) {
-                System.out.println("\r" + msg);
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+            String message;
+            while ((message = reader.readLine()) != null) {
+                System.out.println("\r" + message);
                 System.out.print("You: ");
             }
         } catch (IOException e) {
-            System.out.println("Disconnected");
+            System.out.println("Disconnected from server.");
         }
-        // TODO: fermer le reader
     }
 
-    // envoi messages
+    // Sends messages typed in the console to the server
     private void sendMessages() {
-        try {
-            OutputStream outputStream = s.getOutputStream();
-            OutputStreamWriter osw = new OutputStreamWriter(outputStream);
-            BufferedWriter w = new BufferedWriter(osw);
-            lecteurConsole = new BufferedReader(new InputStreamReader(System.in));
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))) {
+            consoleReader = new BufferedReader(new InputStreamReader(System.in));
             String input;
-            while ((input = lecteurConsole.readLine()) != null) {
-                w.write(input);
-                w.newLine();
-                w.flush();
+            while ((input = consoleReader.readLine()) != null) {
+                writer.write(formatMessage(input));
+                writer.newLine();
+                writer.flush();
                 System.out.print("You: ");
-                messageCount = messageCount + 1;
+                messageCount++;
             }
         } catch (IOException e) {
-            System.out.println("Error: " + e.getMessage());
+            System.out.println("Error sending message: " + e.getMessage());
         }
     }
 
-    // arrêt propre
+    // Closes the executor and socket
     private void shutdown() throws IOException {
-        if (exec != null) {
-            exec.shutdown();
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdown();
         }
-        if (s != null && !s.isClosed()) {
-            s.close();
+        if (socket != null && !socket.isClosed()) {
+            socket.close();
         }
     }
 
+    // Trims messages to remove unnecessary whitespace
     private String formatMessage(String msg) {
         return msg.trim();
     }
