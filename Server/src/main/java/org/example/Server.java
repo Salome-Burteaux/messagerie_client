@@ -9,30 +9,30 @@ import java.util.List;
 
 public class Server {
     private int port;
-    private List<ClientHandler> _clientsList = new ArrayList<>();
+    private List<ClientHandler> clientsList = new ArrayList<>();
     private ServerSocket serverSocket;
     private boolean isRunning = false;
-    private List<String> hist = new ArrayList<>();
-    private int count = 0;
+    private List<String> history = new ArrayList<>();
+    private int clientCounter = 0;
 
     public Server(int port) {
 
         this.port = port;
     }
 
-    // crée un serverSocket
+    // Starts the server and listens for incoming clients
     public void start() throws IOException {
         serverSocket = new ServerSocket();
         serverSocket.bind(new InetSocketAddress("0.0.0.0", port));
         isRunning = true;
+
         System.out.println("Chat server started on port " + port);
 
         while (isRunning) {
-            Socket cs = serverSocket.accept();
-            ClientHandler ch = new ClientHandler(cs, this);
-            _clientsList.add(ch);
-            Thread t = new Thread(ch);
-            t.start();
+            Socket clientSocket = serverSocket.accept();
+            ClientHandler handler = new ClientHandler(clientSocket, clientCounter++);
+            clientsList.add(handler);
+            new Thread(handler).start();
         }
     }
 
@@ -43,33 +43,28 @@ public class Server {
         }
     }
 
-    // méthode pour envoyer message à tout le monde
-    public void broadcastMessage(ClientHandler sender, String msg) {
-        hist.add(msg);
-        if (hist.size() > 100) {
-            hist.remove(0);
+    // Send a message to every connected client (except sender)
+    public synchronized void broadcastMessage(ClientHandler sender, String msg) {
+        history.add(msg);
+        if (history.size() > 100) {
+            history.remove(0);
         }
 
-        for (int i = 0; i < _clientsList.size(); i++) {
-            ClientHandler c = _clientsList.get(i);
-            if (c != sender && c.userName != null) {
-                try {
-                    c.out.println(msg);
-                } catch (Exception e) {
-                    // client déconnecté ?
-                }
+        for (ClientHandler c : clientsList) {
+            if (c != sender && c.getUserName() != null) {
+                c.sendMessage(msg);
             }
         }
     }
 
-    // envoi historique
-    public void sendHistoryToClient(ClientHandler c) {
-        for (int i = 0; i < hist.size(); i++) {
-            c.out.println(hist.get(i));
+    // Send chat history to a newly connected client
+    public void sendHistoryToClient(ClientHandler client) {
+        for (String msg : history) {
+            client.sendMessage(msg);
         }
     }
 
-    // Classe interne pour gérer chaque client
+    // Inner client handler
     class ClientHandler implements Runnable {
         private Socket socket;
         private PrintWriter out;
@@ -81,67 +76,70 @@ public class Server {
             this.socket = socket;
             this.clientId = clientId;
         }
+
+        public String getUserName() {
+            return userName;
+        }
+
+        public void sendMessage(String msg) {
+            if (out != null) {
+                out.println(msg);
+            }
+        }
+
         @Override
         public void run() {
             try {
                 setupStreams();
                 requestUserName();
-                sendHistoryToClient();
+                sendHistoryToClient(this);
                 broadcastJoinMessage();
                 listenForMessages();
 
-            } catch (IOException e){
+            } catch (IOException e) {
                 System.out.println("Client error: " + e.getMessage());
             } finally {
                 disconnect();
             }
-
-                InputStream in = socket.getInputStream();
-                BufferedReader r = new BufferedReader(new InputStreamReader(in));
-                OutputStream outStream = socket.getOutputStream();
-
-
-                sendHistoryToClient(this);
-                broadcastMessage(this, m);
-
-                String receivedMessage;
-                while ((receivedMessage = r.readLine()) != null) {
-                    m = userName + ": " + receivedMessage;
-                    System.out.println(m);
-                    broadcastMessage(this, m);
-                }
-
-                String msgLeave = userName + " has left the chat.";
-                System.out.println(msgLeave);
-                broadcastMessage(this, msgLeave);
-
-            } catch (IOException e) {
-                System.out.println("Client error");
-            }
-
-
+        }
 
         private void setupStreams() throws IOException {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
         }
 
-        private void requestUserName() {
-
-            out.println("Enter your name: ");
+        private void requestUserName() throws IOException {
+            out.println("Enter your name:");
             userName = in.readLine();
-            String m = userName + " has joined the chat.";
-            System.out.println(m);
-        };
+        }
 
         private void broadcastJoinMessage() {
+            String msg = userName + " has joined the chat.";
+            System.out.println(msg);
+            broadcastMessage(this, msg);
+        }
 
-        };
+        private void listenForMessages() throws IOException {
+            String msg;
+            while ((msg = in.readLine()) != null) {
+                String formatted = userName + ": " + msg;
+                System.out.println(formatted);
+                broadcastMessage(this, formatted);
+            }
+        }
 
-        private void sendHistoryToClient() {};
+        private void disconnect() {
+            try {
+                String msg = userName + " has left the chat.";
+                System.out.println(msg);
+                broadcastMessage(this, msg);
 
-        private void listenForMessages() {};
+                if (in != null) in.close();
+                if (out != null) out.close();
+                if (socket != null && !socket.isClosed()) socket.close();
 
+            } catch (IOException ignored) {
+            }
         }
     }
 }
