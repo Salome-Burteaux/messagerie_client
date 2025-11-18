@@ -41,3 +41,9 @@ Procédure suivie :
 Depuis le dossier serveur (ou client) :
 
 *./gradlew run*
+
+
+## Configuration externe
+
+Le projet utilise un fichier app.properties pour centraliser toutes les configurations applicatives, afin de séparer le code de la configuration.
+Il y en a un dans le projet serveur ainsi que le client et permet de configurer le serveur, le port, le timeout...
