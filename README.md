@@ -1,6 +1,6 @@
 # Java_Bonnes_Pratiques
 
-##//// Présentation du projet ////
+## Présentation du projet 
 
 Ce projet consiste à développer une application de chat TCP client/serveur en Java tout en respectant les bonnes pratiques d’architecture logicielle :
 
@@ -17,7 +17,7 @@ Ce projet consiste à développer une application de chat TCP client/serveur en 
 - Utilisation de Maven/Gradle pour la gestion des dépendances
 
 
-##//// Mise à jour maîtrisée d’une dépendance ////
+## Mise à jour maîtrisée d’une dépendance
 
 Nous avons effectué une mise à jour maîtrisée de la dépendance Apache Commons IO pour démontrer notre capacité à gérer les dépendances de manière professionnelle.
 
@@ -27,17 +27,17 @@ Procédure suivie :
 
 - Lecture des release notes
 
-- Mise à jour du fichier build.gradle.kts
+- Mise à jour du fichier *build.gradle.kts*
 
-- Rafraîchissement du projet avec la commande : ./gradlew clean build
+- Rafraîchissement du projet avec la commande : *./gradlew clean build*
 
 - Exécution des tests unitaires
 
 - Validation fonctionnelle (client ↔ serveur)
 
 
-##//// Comment lancer le serveur et le client ////
+## Comment lancer le serveur et le client 
 
 Depuis le dossier serveur (ou client) :
 
-./gradlew run
+*./gradlew run*
