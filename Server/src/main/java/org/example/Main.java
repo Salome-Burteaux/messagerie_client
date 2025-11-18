@@ -1,16 +1,15 @@
 package org.example;
 
-import java.io.IOException;
+import org.example.server.ServerController;
 
 public class Main {
     public static void main(String[] args) {
-        // Port du serveur
-        int p = 12345;
-        Server s = new Server(p);
+        int port = 12345;
+
         try {
             System.out.println("Starting server...");
-            s.start();
-        } catch (IOException e) {
+            new ServerController(port).start();
+        } catch (Exception e) {
             System.err.println("Server failed: " + e.getMessage());
         }
     }
